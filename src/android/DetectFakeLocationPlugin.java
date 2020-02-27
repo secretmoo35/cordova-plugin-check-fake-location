@@ -52,6 +52,7 @@ public class DetectFakeLocationPlugin extends CordovaPlugin {
         mContext = this.cordova.getActivity().getApplicationContext();
 
         if (action.equals("checkIsMockLocation")) {
+            Log.i("xxx", "Init");
             checkIsMockLocation(action, callbackContext);
             return true;
         }
@@ -63,24 +64,31 @@ public class DetectFakeLocationPlugin extends CordovaPlugin {
         isSuccess = true;
         mockStatus = false;
         try {
+            Log.i("xxx", "Start");
             if (checkPermission(Manifest.permission.ACCESS_COARSE_LOCATION, mContext)
                     && checkPermission(Manifest.permission.ACCESS_FINE_LOCATION, mContext)) {
+                Log.i("xxx", "Perm OK");
                 getLocation(callbackContext);
             } else {
+                Log.i("xxx", "Perm fail");
+                // requesrLocationPermission();
                 isSuccess = false;
             }
 
+            // Wait for listener location
             while (isSuccess) {
+                Log.i("xxx", "End proccess2");
             }
             rs.put("status", mockStatus);
         } catch (JSONException err) {
             status = PluginResult.Status.ERROR;
             result = "" + err.toString();
+            Log.i("xxx", "End proccess1");
         } catch (Exception err) {
             status = PluginResult.Status.ERROR;
             result = "" + err.toString();
         }
-
+        Log.i("xxx", "End");
         callbackContext.sendPluginResult(new PluginResult(status, rs));
 
     }
@@ -95,6 +103,7 @@ public class DetectFakeLocationPlugin extends CordovaPlugin {
     }
 
     private void getLocation(CallbackContext callbackContext) {
+        Log.i("xxx", "Get Location");
         f = LocationServices.getFusedLocationProviderClient(mContext);
         f.getLastLocation().addOnSuccessListener(new OnSuccessListener<Location>() {
             @Override
@@ -102,16 +111,19 @@ public class DetectFakeLocationPlugin extends CordovaPlugin {
                 JSONObject rs = new JSONObject();
                 try {
                     mockStatus = isMockLocation(location);
+                    Log.i("xxx", "get lo OK2 = " + mockStatus);
                     rs.put("status", mockStatus);
                 } catch (JSONException err) {
+                    Log.i("xxx", err.toString());
                     status = PluginResult.Status.ERROR;
                     result = "" + err.toString();
                 } catch (Exception err) {
+                    Log.i("xxx", err.toString());
                     status = PluginResult.Status.ERROR;
                     result = "" + err.toString();
                 }
                 isSuccess = false;
-                callbackContext.sendPluginResult(new PluginResult(status, rs));
+                // callbackContext.sendPluginResult(new PluginResult(status, rs));
             }
         });
     }
@@ -123,4 +135,5 @@ public class DetectFakeLocationPlugin extends CordovaPlugin {
     public void requestAllPermission(String[] permissionArray, int requestCode) {
         cordova.requestPermissions(this, requestCode, permissionArray);
     }
+
 }
