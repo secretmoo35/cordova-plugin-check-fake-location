@@ -11,6 +11,7 @@ Test on Android 5+
 
 declare var cordova: any;
 
+
 checkFakeLocation(){
 
     cordova.plugins.DetectFakeLocationPlugin.checkAllowMockLacation({}, (res: any) => {
