@@ -1,139 +1,140 @@
 package cordova.plugin.check.fake.location;
 
-import org.apache.cordova.CordovaPlugin;
+import android.Manifest;
+import android.annotation.TargetApi;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.os.Build;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.support.v4.app.ActivityCompat;
+import android.util.Log;
 import org.apache.cordova.CallbackContext;
-import org.apache.cordova.PluginResult;
-
+import org.apache.cordova.CordovaPlugin;
+import org.apache.cordova.CordovaWebView;
 import org.json.JSONArray;
 import org.json.JSONException;
-import org.json.JSONObject;
-import android.provider.Settings;
-import android.Manifest;
-
-import android.provider.Settings.Secure;
-
-import android.location.Location;
-import android.location.LocationManager;
-
-import android.content.Context;
-import android.location.Location;
-import android.os.Bundle;
-import android.os.Build;
-import android.app.Activity;
-
-// import android.support.v4.content.ContextCompat;
-
-import android.content.pm.PackageManager;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageInfo;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnSuccessListener;
-import java.util.List;
-import android.util.Log;
 
 /**
  * This class echoes a string called from JavaScript.
  */
 public class DetectFakeLocationPlugin extends CordovaPlugin {
 
-    private PluginResult.Status status = PluginResult.Status.OK;
-    private String result = "";
-    private Context mContext = null;
-    private String appPackageName = "";
-    private FusedLocationProviderClient f = null;
-    private String[] permissions = { Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.ACCESS_FINE_LOCATION };
-    private boolean isSuccess = true;
-    private boolean mockStatus = false;
+  private static final String TAG = "DetectMockLocation";
 
-    @Override
-    public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
-        mContext = this.cordova.getActivity().getApplicationContext();
+  /* success responses */
+  private static final String MOCKED = "mocked";
+  private static final String NOT_MOCKED = "not_mocked";
 
-        if (action.equals("checkIsMockLocation")) {
-            Log.i("xxx", "Init");
-            checkIsMockLocation(action, callbackContext);
-            return true;
+  /* error responses */
+  private static final String NO_PERMISSION = "no_permission";
+
+  @Override
+  public boolean execute(
+    String action,
+    JSONArray args,
+    CallbackContext callbackContext
+  )
+    throws JSONException {
+    if (Build.VERSION.SDK_INT < 18) {
+      checkMockLocationIsEnabled(callbackContext);
+      return true;
+    } else {
+      checkLocationIsFromMockProvider(callbackContext);
+      return true;
+    }
+  }
+
+  private void checkMockLocationIsEnabled(CallbackContext callbackContext) {
+    boolean allowMockLocationIsEnabled = !android.provider.Settings.Secure
+      .getString(
+        this.cordova.getActivity().getApplicationContext().getContentResolver(),
+        Settings.Secure.ALLOW_MOCK_LOCATION
+      )
+      .equals("0");
+
+    Log.d(TAG, "AllowMockLocationIsEnabled: " + allowMockLocationIsEnabled);
+
+    callbackContext.success(allowMockLocationIsEnabled ? MOCKED : NOT_MOCKED);
+  }
+
+  @TargetApi(18)
+  private void checkLocationIsFromMockProvider(
+    final CallbackContext callbackContext
+  ) {
+    boolean hasPermission =
+      ActivityCompat.checkSelfPermission(
+        this.cordova.getActivity(),
+        Manifest.permission.ACCESS_FINE_LOCATION
+      ) ==
+      PackageManager.PERMISSION_GRANTED ||
+      ActivityCompat.checkSelfPermission(
+        this.cordova.getActivity(),
+        Manifest.permission.ACCESS_COARSE_LOCATION
+      ) ==
+      PackageManager.PERMISSION_GRANTED;
+
+    if (!hasPermission) {
+      callbackContext.error(NO_PERMISSION);
+    } else {
+      LocationManager locationManager = (LocationManager) cordova
+        .getActivity()
+        .getSystemService(Context.LOCATION_SERVICE);
+      assert locationManager != null;
+
+      LocationListener locationListener = new LocationListener() {
+        public void onLocationChanged(Location location) {
+          Log.d(
+            TAG,
+            String.format("onLocationChanged: %s", location.toString())
+          );
+
+          boolean locationIsFromMockProvider = location.isFromMockProvider();
+
+          Log.d(
+            TAG,
+            "LocationIsFromMockProvider: " + locationIsFromMockProvider
+          );
+
+          callbackContext.success(
+            locationIsFromMockProvider ? MOCKED : NOT_MOCKED
+          );
         }
-        return false;
-    }
 
-    private void checkIsMockLocation(String action, CallbackContext callbackContext) {
-        JSONObject rs = new JSONObject();
-        isSuccess = true;
-        mockStatus = false;
-        try {
-            Log.i("xxx", "Start");
-            if (checkPermission(Manifest.permission.ACCESS_COARSE_LOCATION, mContext)
-                    && checkPermission(Manifest.permission.ACCESS_FINE_LOCATION, mContext)) {
-                Log.i("xxx", "Perm OK");
-                getLocation(callbackContext);
-            } else {
-                Log.i("xxx", "Perm fail");
-                // requesrLocationPermission();
-                isSuccess = false;
-            }
-
-            // Wait for listener location
-            while (isSuccess) {
-                Log.i("xxx", "End proccess2");
-            }
-            rs.put("status", mockStatus);
-        } catch (JSONException err) {
-            status = PluginResult.Status.ERROR;
-            result = "" + err.toString();
-            Log.i("xxx", "End proccess1");
-        } catch (Exception err) {
-            status = PluginResult.Status.ERROR;
-            result = "" + err.toString();
+        public void onStatusChanged(
+          String provider,
+          int status,
+          Bundle extras
+        ) {
+          Log.d(
+            TAG,
+            String.format(
+              "onStatusChanged: %s, %d, %s",
+              provider,
+              status,
+              extras.toString()
+            )
+          );
         }
-        Log.i("xxx", "End");
-        callbackContext.sendPluginResult(new PluginResult(status, rs));
 
+        public void onProviderEnabled(String provider) {
+          Log.d(TAG, "onProviderEnabled: " + provider);
+        }
+
+        public void onProviderDisabled(String provider) {
+          Log.d(TAG, "onProviderDisabled: " + provider);
+        }
+      };
+
+      locationManager.requestLocationUpdates(
+        LocationManager.NETWORK_PROVIDER,
+        0,
+        0,
+        locationListener
+      );
     }
-
-    private void requesrLocationPermission() {
-        requestAllPermission(permissions, 111);
-    }
-
-    private Boolean isMockLocation(Location location) {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2 && location != null
-                && location.isFromMockProvider();
-    }
-
-    private void getLocation(CallbackContext callbackContext) {
-        Log.i("xxx", "Get Location");
-        f = LocationServices.getFusedLocationProviderClient(mContext);
-        f.getLastLocation().addOnSuccessListener(new OnSuccessListener<Location>() {
-            @Override
-            public void onSuccess(Location location) {
-                JSONObject rs = new JSONObject();
-                try {
-                    mockStatus = isMockLocation(location);
-                    Log.i("xxx", "get lo OK2 = " + mockStatus);
-                    rs.put("status", mockStatus);
-                } catch (JSONException err) {
-                    Log.i("xxx", err.toString());
-                    status = PluginResult.Status.ERROR;
-                    result = "" + err.toString();
-                } catch (Exception err) {
-                    Log.i("xxx", err.toString());
-                    status = PluginResult.Status.ERROR;
-                    result = "" + err.toString();
-                }
-                isSuccess = false;
-                // callbackContext.sendPluginResult(new PluginResult(status, rs));
-            }
-        });
-    }
-
-    public boolean checkPermission(String permission, Context context) {
-        return cordova.hasPermission(permission);
-    }
-
-    public void requestAllPermission(String[] permissionArray, int requestCode) {
-        cordova.requestPermissions(this, requestCode, permissionArray);
-    }
-
+  }
 }
