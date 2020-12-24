@@ -23,6 +23,7 @@ import org.json.JSONException;
  */
 public class DetectFakeLocationPlugin extends CordovaPlugin {
 
+  LocationListener locationListener;
   private static final String TAG = "DetectMockLocation";
 
   /* success responses */
@@ -31,6 +32,8 @@ public class DetectFakeLocationPlugin extends CordovaPlugin {
 
   /* error responses */
   private static final String NO_PERMISSION = "no_permission";
+  private boolean IS_GPS_ENABLE = false;
+  private boolean IS_NETWORK_ENABLE = false;
 
   @Override
   public boolean execute(
@@ -85,56 +88,75 @@ public class DetectFakeLocationPlugin extends CordovaPlugin {
         .getSystemService(Context.LOCATION_SERVICE);
       assert locationManager != null;
 
-      LocationListener locationListener = new LocationListener() {
-        public void onLocationChanged(Location location) {
-          Log.d(
-            TAG,
-            String.format("onLocationChanged: %s", location.toString())
-          );
+      IS_GPS_ENABLE =
+        locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER);
+      IS_NETWORK_ENABLE =
+        locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
 
-          boolean locationIsFromMockProvider = location.isFromMockProvider();
+      locationListener =
+        new LocationListener() {
+          public void onLocationChanged(Location location) {
+            Log.d(
+              TAG,
+              String.format("onLocationChanged: %s", location.toString())
+            );
 
-          Log.d(
-            TAG,
-            "LocationIsFromMockProvider: " + locationIsFromMockProvider
-          );
+            boolean locationIsFromMockProvider = location.isFromMockProvider();
 
-          callbackContext.success(
-            locationIsFromMockProvider ? MOCKED : NOT_MOCKED
-          );
-        }
+            Log.d(
+              TAG,
+              "LocationIsFromMockProvider: " + locationIsFromMockProvider
+            );
 
-        public void onStatusChanged(
-          String provider,
-          int status,
-          Bundle extras
-        ) {
-          Log.d(
-            TAG,
-            String.format(
-              "onStatusChanged: %s, %d, %s",
-              provider,
-              status,
-              extras.toString()
-            )
-          );
-        }
+            locationManager.removeUpdates(locationListener);
 
-        public void onProviderEnabled(String provider) {
-          Log.d(TAG, "onProviderEnabled: " + provider);
-        }
+            callbackContext.success(
+              locationIsFromMockProvider ? MOCKED : NOT_MOCKED
+            );
+          }
 
-        public void onProviderDisabled(String provider) {
-          Log.d(TAG, "onProviderDisabled: " + provider);
-        }
-      };
+          public void onStatusChanged(
+            String provider,
+            int status,
+            Bundle extras
+          ) {
+            Log.d(
+              TAG,
+              String.format(
+                "onStatusChanged: %s, %d, %s",
+                provider,
+                status,
+                extras.toString()
+              )
+            );
+          }
 
-      locationManager.requestLocationUpdates(
-        LocationManager.NETWORK_PROVIDER,
-        0,
-        0,
-        locationListener
-      );
+          public void onProviderEnabled(String provider) {
+            Log.d(TAG, "onProviderEnabled: " + provider);
+          }
+
+          public void onProviderDisabled(String provider) {
+            Log.d(TAG, "onProviderDisabled: " + provider);
+          }
+        };
+
+      if (IS_GPS_ENABLE) {
+        locationManager.requestLocationUpdates(
+          LocationManager.GPS_PROVIDER,
+          0,
+          0,
+          locationListener
+        );
+      }
+
+      if (IS_NETWORK_ENABLE) {
+        locationManager.requestLocationUpdates(
+          LocationManager.NETWORK_PROVIDER,
+          0,
+          0,
+          locationListener
+        );
+      }
     }
   }
 }
