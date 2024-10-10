@@ -7,7 +7,7 @@
         <clobbers target="cordova.plugins.DetectFakeLocationPlugin" />
     </js-module>
     <platform name="android">
-        <framework src="com.google.android.gms:play-services-location:15.0.1" />
+        <framework src="com.google.android.gms:play-services-location:16.0.0" />
         <config-file parent="/*" target="res/xml/config.xml">
             <feature name="DetectFakeLocationPlugin">
                 <param name="android-package" value="cordova.plugin.check.fake.location.DetectFakeLocationPlugin" />
